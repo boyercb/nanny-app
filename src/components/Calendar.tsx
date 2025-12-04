@@ -215,6 +215,11 @@ export default function CalendarComponent() {
       return acc + (duration * curr.hourlyRate)
   }, 0)
 
+  const totalPaidInView = filteredEvents.filter(e => e.isPaid).reduce((acc, curr) => {
+      const duration = (curr.end.getTime() - curr.start.getTime()) / (1000 * 60 * 60)
+      return acc + (duration * curr.hourlyRate)
+  }, 0)
+
   const totalOwed = events.filter(e => !e.isPaid).reduce((acc, curr) => {
       const duration = (curr.end.getTime() - curr.start.getTime()) / (1000 * 60 * 60)
       return acc + (duration * curr.hourlyRate)
@@ -327,9 +332,15 @@ export default function CalendarComponent() {
             <span className="text-gray-500 block text-xs uppercase tracking-wide">Period Total</span>
             <span className="font-medium text-gray-900">${totalPay.toFixed(2)}</span>
           </div>
-          <div className="ml-auto bg-red-50 px-3 py-1 rounded border border-red-100">
-            <span className="text-red-500 block text-xs uppercase tracking-wide font-bold">Total Owed</span>
-            <span className="font-bold text-red-600 text-lg">${totalOwed.toFixed(2)}</span>
+          <div className="ml-auto flex gap-4">
+            <div className="bg-green-50 px-3 py-1 rounded border border-green-100">
+              <span className="text-green-500 block text-xs uppercase tracking-wide font-bold">Total Paid</span>
+              <span className="font-bold text-green-600 text-lg">${totalPaidInView.toFixed(2)}</span>
+            </div>
+            <div className="bg-red-50 px-3 py-1 rounded border border-red-100">
+              <span className="text-red-500 block text-xs uppercase tracking-wide font-bold">Total Owed</span>
+              <span className="font-bold text-red-600 text-lg">${totalOwed.toFixed(2)}</span>
+            </div>
           </div>
         </div>
       </div>
