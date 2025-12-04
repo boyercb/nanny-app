@@ -261,6 +261,12 @@ export default function CalendarComponent() {
     return { style }
   }
 
+  const eventTitleAccessor = (event: Shift) => {
+    const start = moment(event.start).format('h:mma')
+    const end = moment(event.end).format('h:mma')
+    return `${event.title || 'Shift'} ${start} to ${end}`
+  }
+
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       {/* Header */}
@@ -367,6 +373,7 @@ export default function CalendarComponent() {
               onNavigate={(date: Date) => setDate(date)}
               onView={(view: any) => setView(view)}
               eventPropGetter={eventStyleGetter}
+              titleAccessor={eventTitleAccessor as any}
             />
           </div>
         ) : (
