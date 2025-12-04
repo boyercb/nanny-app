@@ -300,7 +300,7 @@ export default function CalendarComponent() {
               title="Mark all visible shifts as paid"
             >
               <Check size={16} />
-              Mark Paid
+              Mark all as Paid
             </button>
 
             <button 
