@@ -45,6 +45,12 @@ const handler = NextAuth({
             email: process.env.WIFE_EMAIL, 
             passwordHash: getHash(process.env.WIFE_PASSWORD)
           }
+          const user3 = { 
+            id: "3", 
+            name: "Nanny", 
+            email: process.env.NANNY_EMAIL, 
+            passwordHash: getHash(process.env.NANNY_PASSWORD)
+          }
 
           console.log("Attempting login for:", credentials?.email);
 
@@ -72,6 +78,16 @@ const handler = NextAuth({
             const isValid = await bcrypt.compare(credentials.password, user2.passwordHash)
             if (isValid) {
               return { id: user2.id, name: user2.name, email: user2.email }
+            }
+          }
+
+          // Check User 3
+          if (user3.email && inputEmail === user3.email.toLowerCase().trim()) {
+            if (!user3.passwordHash) return null;
+            
+            const isValid = await bcrypt.compare(credentials.password, user3.passwordHash)
+            if (isValid) {
+              return { id: user3.id, name: user3.name, email: user3.email }
             }
           }
 
