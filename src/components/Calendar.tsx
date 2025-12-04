@@ -94,11 +94,11 @@ export default function CalendarComponent() {
   // Calculate pay based on view
   const { start, end, label } = useMemo(() => {
     let start, end, label;
-    if (view === Views.MONTH) {
+    if (view === 'month') {
       start = moment(date).startOf('month').toDate();
       end = moment(date).endOf('month').toDate();
       label = `Month of ${moment(date).format('MMMM')}`;
-    } else if (view === Views.DAY) {
+    } else if (view === 'day') {
       start = moment(date).startOf('day').toDate();
       end = moment(date).endOf('day').toDate();
       label = moment(date).format('MMM D, YYYY');
@@ -126,7 +126,7 @@ export default function CalendarComponent() {
   }, 0)
 
   const weeklyBreakdown = useMemo(() => {
-    if (view !== Views.MONTH) return [];
+    if (view !== 'month') return [];
 
     const startOfMonth = moment(date).startOf('month');
     const endOfMonth = moment(date).endOf('month');
@@ -190,7 +190,7 @@ export default function CalendarComponent() {
                 <div className="text-sm text-gray-600">{label}</div>
                 <div className="text-sm text-gray-600">Total Hours: {totalHours.toFixed(2)}</div>
                 <div className="text-xl font-bold text-green-600">Total Pay: ${totalPay.toFixed(2)}</div>
-                {view === Views.MONTH && weeklyBreakdown.length > 0 && (
+                {view === 'month' && weeklyBreakdown.length > 0 && (
                   <div className="mt-2 pt-2 border-t border-gray-100 text-xs">
                     {weeklyBreakdown.map((week, i) => (
                       <div key={i} className="flex justify-between gap-4">
