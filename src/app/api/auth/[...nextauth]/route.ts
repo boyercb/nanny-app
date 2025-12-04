@@ -12,17 +12,20 @@ const handler = NextAuth({
       },
       async authorize(credentials, req) {
         try {
+          // Helper to strip quotes if they were accidentally pasted into env vars
+          const cleanHash = (h: string | undefined) => h?.replace(/^["']|["']$/g, '');
+
           const user1 = { 
             id: "1", 
             name: "User 1", 
             email: process.env.MY_EMAIL, 
-            passwordHash: process.env.MY_PASSWORD 
+            passwordHash: cleanHash(process.env.MY_PASSWORD)
           }
           const user2 = { 
             id: "2", 
             name: "User 2", 
             email: process.env.WIFE_EMAIL, 
-            passwordHash: process.env.WIFE_PASSWORD 
+            passwordHash: cleanHash(process.env.WIFE_PASSWORD)
           }
 
           console.log("Attempting login for:", credentials?.email);
