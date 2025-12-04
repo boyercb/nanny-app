@@ -220,6 +220,27 @@ export default function CalendarComponent() {
       return acc + (duration * curr.hourlyRate)
   }, 0)
 
+  const markAllAsPaid = async () => {
+    const unpaidIds = filteredEvents.filter(e => !e.isPaid && e.id).map(e => e.id)
+    
+    if (unpaidIds.length === 0) {
+        alert("All shifts in this view are already paid!")
+        return
+    }
+
+    if (!confirm(`Mark ${unpaidIds.length} shifts as paid?`)) return
+
+    await fetch('/api/shifts/bulk', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: unpaidIds, data: { isPaid: true } }),
+    })
+
+    setEvents(prev => prev.map(e => 
+        e.id && unpaidIds.includes(e.id) ? { ...e, isPaid: true } : e
+    ))
+  }
+
   // --- Render Helpers ---
 
   const eventStyleGetter = (event: any) => {
@@ -272,6 +293,15 @@ export default function CalendarComponent() {
                 <span className="text-gray-400">/hr</span>
               </div>
             </div>
+
+            <button 
+              onClick={markAllAsPaid}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100"
+              title="Mark all visible shifts as paid"
+            >
+              <Check size={16} />
+              Mark Paid
+            </button>
 
             <button 
               onClick={exportCSV}
