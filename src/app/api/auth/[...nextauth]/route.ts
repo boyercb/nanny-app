@@ -12,20 +12,38 @@ const handler = NextAuth({
       },
       async authorize(credentials, req) {
         try {
-          // Helper to strip quotes if they were accidentally pasted into env vars
-          const cleanHash = (h: string | undefined) => h?.replace(/^["']|["']$/g, '');
+          // Helper to handle both standard bcrypt hashes and Base64 encoded hashes
+          // This fixes issues where Vercel/Shells strip '$' characters from env vars
+          const getHash = (envVar: string | undefined) => {
+            if (!envVar) return undefined;
+            let hash = envVar.replace(/^["']|["']$/g, ''); // clean quotes
+            
+            // If it looks like a standard bcrypt hash (starts with $2), use it.
+            if (hash.startsWith('$2')) return hash;
+            
+            // If not, try to decode from Base64
+            try {
+              const decoded = Buffer.from(hash, 'base64').toString('utf-8');
+              if (decoded.startsWith('$2')) return decoded;
+            } catch (e) {
+              // ignore error, wasn't base64
+            }
+            
+            // Return original if all else fails (likely corrupted but we can't fix it here)
+            return hash;
+          };
 
           const user1 = { 
             id: "1", 
             name: "User 1", 
             email: process.env.MY_EMAIL, 
-            passwordHash: cleanHash(process.env.MY_PASSWORD)
+            passwordHash: getHash(process.env.MY_PASSWORD)
           }
           const user2 = { 
             id: "2", 
             name: "User 2", 
             email: process.env.WIFE_EMAIL, 
-            passwordHash: cleanHash(process.env.WIFE_PASSWORD)
+            passwordHash: getHash(process.env.WIFE_PASSWORD)
           }
 
           console.log("Attempting login for:", credentials?.email);
