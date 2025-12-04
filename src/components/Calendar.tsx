@@ -225,7 +225,7 @@ export default function CalendarComponent() {
           style={{ height: '100%' }}
           onNavigate={(date: Date) => setDate(date)}
           onView={(view: any) => setView(view)}
-          eventPropGetter={(event: Shift) => ({
+          eventPropGetter={(event: any) => ({
               className: 'bg-blue-500 text-white rounded border-none shadow-sm'
           })}
         />
