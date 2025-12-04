@@ -15,3 +15,8 @@ model Shift {
   hourlyRate Float
   title      String?
 }
+
+model Config {
+  id         Int      @id @default(1)
+  hourlyRate Float    @default(20)
+}

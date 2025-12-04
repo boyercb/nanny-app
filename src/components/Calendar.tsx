@@ -24,8 +24,9 @@ export default function CalendarComponent() {
   const [view, setView] = useState<any>(Views.WEEK)
   const [date, setDate] = useState(new Date())
 
-  // Fetch events
+  // Fetch events and config
   useEffect(() => {
+    // Fetch events
     fetch('/api/shifts')
       .then(res => res.json())
       .then(data => {
@@ -36,7 +37,29 @@ export default function CalendarComponent() {
         }))
         setEvents(formatted)
       })
+
+    // Fetch config
+    fetch('/api/config')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.hourlyRate) {
+          setHourlyRate(data.hourlyRate)
+        }
+      })
   }, [])
+
+  const handleRateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newRate = Number(e.target.value)
+    setHourlyRate(newRate)
+    
+    // Debounce or just save on every change (for simplicity, saving on every change here, 
+    // but in production maybe debounce)
+    fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hourlyRate: newRate }),
+    })
+  }
 
   const handleSelectSlot = useCallback(
     ({ start, end }: { start: Date; end: Date }) => {
@@ -182,7 +205,7 @@ export default function CalendarComponent() {
                 <input
                     type="number"
                     value={hourlyRate}
-                    onChange={e => setHourlyRate(Number(e.target.value))}
+                    onChange={handleRateChange}
                     className="border border-gray-300 p-1 rounded ml-2 w-20 text-right"
                 />
             </label>

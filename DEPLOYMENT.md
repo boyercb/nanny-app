@@ -48,11 +48,11 @@ Once the database is connected and env vars are set:
      1. Install Vercel CLI: `npm i -g vercel`
      2. Login: `vercel login`
      3. Link project: `vercel link`
-     4. Pull env vars: `vercel env pull .env.local`
+     4. Pull env vars: `vercel env pull .env`
      5. Run migration: `npx prisma db push`
 
 ## 5. Local Development
 To run locally with the production database (or a separate dev branch database):
-1. `vercel env pull .env.local` (to get the DB credentials)
-2. Add your local user/pass credentials to `.env.local` if they aren't pulled (Vercel might not pull sensitive vars if not configured to).
+1. `vercel env pull .env` (to get the DB credentials)
+2. Add your local user/pass credentials to `.env` if they aren't pulled (Vercel might not pull sensitive vars if not configured to).
 3. `npm run dev`
