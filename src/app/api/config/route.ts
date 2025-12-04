@@ -10,7 +10,7 @@ export async function GET() {
     config = await prisma.config.create({
       data: {
         id: 1,
-        hourlyRate: 20
+        hourlyRate: 25
       }
     })
   }

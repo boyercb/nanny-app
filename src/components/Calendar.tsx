@@ -20,7 +20,7 @@ interface Shift {
 
 export default function CalendarComponent() {
   const [events, setEvents] = useState<Shift[]>([])
-  const [hourlyRate, setHourlyRate] = useState(20)
+  const [hourlyRate, setHourlyRate] = useState(25)
   const [view, setView] = useState<any>(Views.WEEK)
   const [date, setDate] = useState(new Date())
 
