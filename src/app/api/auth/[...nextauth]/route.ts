@@ -44,6 +44,12 @@ const handler = NextAuth({
               console.error("User 1 password hash missing in env");
               return null;
             }
+            
+            console.log("Debug Info:");
+            console.log("- Input password length:", credentials.password.length);
+            console.log("- Stored hash length:", user1.passwordHash.length);
+            console.log("- Stored hash prefix:", user1.passwordHash.substring(0, 10));
+            
             const isValid = await bcrypt.compare(credentials.password, user1.passwordHash)
             console.log("User 1 password valid:", isValid);
             if (isValid) {
