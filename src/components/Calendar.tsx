@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Calendar, momentLocalizer, Views } from 'react-big-calendar'
 import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop'
 import moment from 'moment'
+import { Download, List, Calendar as CalendarIcon, Check, X, Trash2, DollarSign, Clock } from 'lucide-react'
 import 'react-big-calendar/lib/addons/dragAndDrop/styles.css'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
 
@@ -11,11 +12,13 @@ const localizer = momentLocalizer(moment)
 const DnDCalendar = withDragAndDrop(Calendar)
 
 interface Shift {
-  id: number
+  id?: number
   start: Date
   end: Date
   title?: string
   hourlyRate: number
+  isPaid: boolean
+  notes?: string
 }
 
 export default function CalendarComponent() {
@@ -23,10 +26,14 @@ export default function CalendarComponent() {
   const [hourlyRate, setHourlyRate] = useState(25)
   const [view, setView] = useState<any>(Views.WEEK)
   const [date, setDate] = useState(new Date())
+  const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar')
+  
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [selectedShift, setSelectedShift] = useState<Shift | null>(null)
 
   // Fetch events and config
   useEffect(() => {
-    // Fetch events
     fetch('/api/shifts')
       .then(res => res.json())
       .then(data => {
@@ -38,7 +45,6 @@ export default function CalendarComponent() {
         setEvents(formatted)
       })
 
-    // Fetch config
     fetch('/api/config')
       .then(res => res.json())
       .then(data => {
@@ -51,9 +57,6 @@ export default function CalendarComponent() {
   const handleRateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newRate = Number(e.target.value)
     setHourlyRate(newRate)
-    
-    // Debounce or just save on every change (for simplicity, saving on every change here, 
-    // but in production maybe debounce)
     fetch('/api/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -61,23 +64,27 @@ export default function CalendarComponent() {
     })
   }
 
+  // --- Calendar Handlers ---
+
   const handleSelectSlot = useCallback(
     ({ start, end }: { start: Date; end: Date }) => {
-      const title = 'Nanny Shift'
-      const newEvent = { start, end, title, hourlyRate }
-
-      fetch('/api/shifts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newEvent),
+      setSelectedShift({
+        start,
+        end,
+        title: 'Nanny Shift',
+        hourlyRate,
+        isPaid: false,
+        notes: ''
       })
-        .then(res => res.json())
-        .then(savedEvent => {
-           setEvents(prev => [...prev, { ...savedEvent, start: new Date(savedEvent.start), end: new Date(savedEvent.end) }])
-        })
+      setIsModalOpen(true)
     },
     [hourlyRate]
   )
+
+  const handleSelectEvent = useCallback((event: Shift) => {
+    setSelectedShift(event)
+    setIsModalOpen(true)
+  }, [])
 
   const handleEventDrop = useCallback(
     ({ event, start, end }: any) => {
@@ -107,15 +114,76 @@ export default function CalendarComponent() {
     []
   )
 
-  const handleSelectEvent = useCallback((event: any) => {
-      if(confirm('Delete this shift?')) {
-          setEvents(prev => prev.filter(e => e.id !== event.id))
-          fetch(`/api/shifts/${event.id}`, { method: 'DELETE' })
-      }
-  }, [])
+  // --- Modal Actions ---
 
-  // Calculate pay based on view
-  const { start, end, label } = useMemo(() => {
+  const saveShift = async () => {
+    if (!selectedShift) return
+
+    const method = selectedShift.id ? 'PUT' : 'POST'
+    const url = selectedShift.id ? `/api/shifts/${selectedShift.id}` : '/api/shifts'
+
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(selectedShift),
+    })
+    const savedEvent = await res.json()
+    
+    const formattedEvent = {
+      ...savedEvent,
+      start: new Date(savedEvent.start),
+      end: new Date(savedEvent.end)
+    }
+
+    if (selectedShift.id) {
+      setEvents(prev => prev.map(e => e.id === formattedEvent.id ? formattedEvent : e))
+    } else {
+      setEvents(prev => [...prev, formattedEvent])
+    }
+    setIsModalOpen(false)
+  }
+
+  const deleteShift = async () => {
+    if (!selectedShift?.id) return
+    if (!confirm('Delete this shift?')) return
+
+    await fetch(`/api/shifts/${selectedShift.id}`, { method: 'DELETE' })
+    setEvents(prev => prev.filter(e => e.id !== selectedShift.id))
+    setIsModalOpen(false)
+  }
+
+  // --- Export ---
+
+  const exportCSV = () => {
+    const headers = ['Start Date', 'Start Time', 'End Date', 'End Time', 'Hours', 'Rate', 'Total', 'Status', 'Notes']
+    const rows = events.map(e => {
+      const duration = (e.end.getTime() - e.start.getTime()) / (1000 * 60 * 60)
+      return [
+        moment(e.start).format('YYYY-MM-DD'),
+        moment(e.start).format('HH:mm'),
+        moment(e.end).format('YYYY-MM-DD'),
+        moment(e.end).format('HH:mm'),
+        duration.toFixed(2),
+        e.hourlyRate,
+        (duration * e.hourlyRate).toFixed(2),
+        e.isPaid ? 'Paid' : 'Unpaid',
+        `"${(e.notes || '').replace(/"/g, '""')}"` // Escape quotes
+      ].join(',')
+    })
+    
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows].join('\n')
+    const encodedUri = encodeURI(csvContent)
+    const link = document.createElement("a")
+    link.setAttribute("href", encodedUri)
+    link.setAttribute("download", `nanny_shifts_${moment().format('YYYY-MM-DD')}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  // --- Calculations ---
+
+  const { start: viewStart, end: viewEnd, label } = useMemo(() => {
     let start, end, label;
     if (view === 'month') {
       start = moment(date).startOf('month').toDate();
@@ -126,7 +194,6 @@ export default function CalendarComponent() {
       end = moment(date).endOf('day').toDate();
       label = moment(date).format('MMM D, YYYY');
     } else {
-      // Default to WEEK
       start = moment(date).startOf('week').toDate();
       end = moment(date).endOf('week').toDate();
       label = `Week of ${moment(start).format('MMM D')}`;
@@ -135,7 +202,7 @@ export default function CalendarComponent() {
   }, [view, date]);
 
   const filteredEvents = events.filter(e =>
-      e.start >= start && e.end <= end
+      e.start >= viewStart && e.end <= viewEnd
   )
 
   const totalHours = filteredEvents.reduce((acc, curr) => {
@@ -145,114 +212,264 @@ export default function CalendarComponent() {
 
   const totalPay = filteredEvents.reduce((acc, curr) => {
       const duration = (curr.end.getTime() - curr.start.getTime()) / (1000 * 60 * 60)
-      return acc + (duration * hourlyRate)
+      return acc + (duration * curr.hourlyRate)
   }, 0)
 
-  const weeklyBreakdown = useMemo(() => {
-    if (view !== 'month') return [];
+  const totalOwed = events.filter(e => !e.isPaid).reduce((acc, curr) => {
+      const duration = (curr.end.getTime() - curr.start.getTime()) / (1000 * 60 * 60)
+      return acc + (duration * curr.hourlyRate)
+  }, 0)
 
-    const startOfMonth = moment(date).startOf('month');
-    const endOfMonth = moment(date).endOf('month');
-    const weeks = [];
-    
-    let current = startOfMonth.clone().startOf('week');
-    
-    while (current.isBefore(endOfMonth)) {
-      const weekStart = current.toDate();
-      const weekEnd = current.clone().endOf('week').toDate();
-      
-      const weekEvents = events.filter(e => 
-        e.start >= weekStart && e.start <= weekEnd
-      );
-      
-      const hours = weekEvents.reduce((acc, curr) => {
-          const duration = (curr.end.getTime() - curr.start.getTime()) / (1000 * 60 * 60)
-          return acc + duration
-      }, 0);
+  // --- Render Helpers ---
 
-      const pay = hours * hourlyRate;
-      
-      if (pay > 0) {
-        weeks.push({
-            label: `${moment(weekStart).format('MMM D')}-${moment(weekEnd).format('D')}`,
-            pay,
-            hours
-        });
-      }
-      
-      current.add(1, 'week');
+  const eventStyleGetter = (event: Shift) => {
+    const style = {
+      backgroundColor: event.isPaid ? '#10B981' : '#3B82F6', // Green if paid, Blue if not
+      borderRadius: '4px',
+      opacity: 0.8,
+      color: 'white',
+      border: '0px',
+      display: 'block'
     }
-    return weeks;
-  }, [view, date, events, hourlyRate]);
-
-  const components = useMemo(() => ({
-    month: {
-      event: ({ event }: any) => (
-        <div className="text-xs">
-           {moment(event.start).format('h:mma')}-{moment(event.end).format('h:mma')} {event.title}
-        </div>
-      )
-    }
-  }), [])
+    return { style }
+  }
 
   return (
-    <div className="h-screen p-4 flex flex-col gap-4 bg-gray-50">
-      <div className="flex justify-between items-center bg-white p-4 rounded shadow">
-        <h1 className="text-2xl font-bold text-gray-800">Nanny Tracker</h1>
-        <div className="flex gap-4 items-center">
-            <label className="text-gray-700 font-medium">
-                Hourly Rate: $
-                <input
-                    type="number"
-                    value={hourlyRate}
-                    onChange={handleRateChange}
-                    className="border border-gray-300 p-1 rounded ml-2 w-20 text-right"
-                />
-            </label>
-            <div className="text-right border-l pl-4 border-gray-200">
-                <div className="text-sm text-gray-600">{label}</div>
-                <div className="text-sm text-gray-600">Total Hours: {totalHours.toFixed(2)}</div>
-                <div className="text-xl font-bold text-green-600">Total Pay: ${totalPay.toFixed(2)}</div>
-                {view === 'month' && weeklyBreakdown.length > 0 && (
-                  <div className="mt-2 pt-2 border-t border-gray-100 text-xs">
-                    {weeklyBreakdown.map((week, i) => (
-                      <div key={i} className="flex justify-between gap-4">
-                        <span className="text-gray-500">{week.label}:</span>
-                        <span className="font-medium">
-                            ${week.pay.toFixed(2)} <span className="text-gray-400 text-[10px]">({week.hours.toFixed(1)}h)</span>
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+    <div className="h-screen flex flex-col bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 p-4 shadow-sm z-10">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-gray-800">Nanny Tracker</h1>
+            <div className="flex bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setViewMode('calendar')}
+                className={`p-2 rounded-md transition-colors ${viewMode === 'calendar' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                <CalendarIcon size={20} />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-2 rounded-md transition-colors ${viewMode === 'list' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                <List size={20} />
+              </button>
             </div>
+          </div>
+
+          <div className="flex flex-wrap gap-4 items-center w-full md:w-auto">
+            <div className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
+              <span className="text-sm text-gray-500">Rate:</span>
+              <div className="flex items-center">
+                <span className="text-gray-400">$</span>
+                <input
+                  type="number"
+                  value={hourlyRate}
+                  onChange={handleRateChange}
+                  className="w-12 bg-transparent text-right font-medium focus:outline-none"
+                />
+                <span className="text-gray-400">/hr</span>
+              </div>
+            </div>
+
+            <button 
+              onClick={exportCSV}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              <Download size={16} />
+              Export
+            </button>
+          </div>
+        </div>
+
+        {/* Summary Bar */}
+        <div className="mt-4 flex flex-wrap gap-4 md:gap-8 text-sm border-t pt-4">
+          <div>
+            <span className="text-gray-500 block text-xs uppercase tracking-wide">Current View</span>
+            <span className="font-medium text-gray-900">{label}</span>
+          </div>
+          <div>
+            <span className="text-gray-500 block text-xs uppercase tracking-wide">Hours</span>
+            <span className="font-medium text-gray-900">{totalHours.toFixed(2)} hrs</span>
+          </div>
+          <div>
+            <span className="text-gray-500 block text-xs uppercase tracking-wide">Period Total</span>
+            <span className="font-medium text-gray-900">${totalPay.toFixed(2)}</span>
+          </div>
+          <div className="ml-auto bg-red-50 px-3 py-1 rounded border border-red-100">
+            <span className="text-red-500 block text-xs uppercase tracking-wide font-bold">Total Owed</span>
+            <span className="font-bold text-red-600 text-lg">${totalOwed.toFixed(2)}</span>
+          </div>
         </div>
       </div>
 
-      <div className="flex-1 bg-white p-4 rounded shadow overflow-hidden">
-        <DnDCalendar
-          localizer={localizer}
-          events={events}
-          defaultView={Views.WEEK}
-          views={[Views.MONTH, Views.WEEK, Views.DAY]}
-          step={30}
-          date={date}
-          view={view}
-          onSelectSlot={handleSelectSlot}
-          onEventDrop={handleEventDrop}
-          onEventResize={handleEventResize}
-          onSelectEvent={handleSelectEvent}
-          selectable
-          resizable
-          components={components}
-          style={{ height: '100%' }}
-          onNavigate={(date: Date) => setDate(date)}
-          onView={(view: any) => setView(view)}
-          eventPropGetter={(event: any) => ({
-              className: 'bg-blue-500 text-white rounded border-none shadow-sm'
-          })}
-        />
+      {/* Main Content */}
+      <div className="flex-1 overflow-hidden p-4">
+        {viewMode === 'calendar' ? (
+          <div className="h-full bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+            <DnDCalendar
+              localizer={localizer}
+              events={events}
+              defaultView={Views.WEEK}
+              views={[Views.MONTH, Views.WEEK, Views.DAY]}
+              step={30}
+              date={date}
+              view={view}
+              onSelectSlot={handleSelectSlot}
+              onEventDrop={handleEventDrop}
+              onEventResize={handleEventResize}
+              onSelectEvent={handleSelectEvent}
+              selectable
+              resizable
+              style={{ height: '100%' }}
+              onNavigate={(date: Date) => setDate(date)}
+              onView={(view: any) => setView(view)}
+              eventPropGetter={eventStyleGetter}
+            />
+          </div>
+        ) : (
+          <div className="h-full bg-white rounded-xl shadow-sm border border-gray-200 overflow-y-auto">
+            <div className="divide-y divide-gray-100">
+              {events
+                .sort((a, b) => b.start.getTime() - a.start.getTime())
+                .map(event => {
+                  const duration = (event.end.getTime() - event.start.getTime()) / (1000 * 60 * 60)
+                  const pay = duration * event.hourlyRate
+                  
+                  return (
+                    <div 
+                      key={event.id} 
+                      onClick={() => handleSelectEvent(event)}
+                      className="p-4 hover:bg-gray-50 cursor-pointer transition-colors flex justify-between items-center"
+                    >
+                      <div className="flex gap-4 items-center">
+                        <div className={`w-2 h-12 rounded-full ${event.isPaid ? 'bg-green-500' : 'bg-blue-500'}`} />
+                        <div>
+                          <div className="font-medium text-gray-900">
+                            {moment(event.start).format('ddd, MMM D')}
+                          </div>
+                          <div className="text-sm text-gray-500 flex items-center gap-2">
+                            <Clock size={14} />
+                            {moment(event.start).format('h:mm a')} - {moment(event.end).format('h:mm a')}
+                            <span className="bg-gray-100 px-2 py-0.5 rounded text-xs">
+                              {duration.toFixed(2)} hrs
+                            </span>
+                          </div>
+                          {event.notes && (
+                            <div className="text-xs text-gray-400 mt-1 italic truncate max-w-[200px]">
+                              {event.notes}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold text-gray-900">${pay.toFixed(2)}</div>
+                        <div className={`text-xs font-medium ${event.isPaid ? 'text-green-600' : 'text-blue-600'}`}>
+                          {event.isPaid ? 'PAID' : 'OWED'}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+                {events.length === 0 && (
+                  <div className="p-8 text-center text-gray-500">No shifts recorded yet.</div>
+                )}
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Edit Modal */}
+      {isModalOpen && selectedShift && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+              <h3 className="font-bold text-gray-800">
+                {selectedShift.id ? 'Edit Shift' : 'New Shift'}
+              </h3>
+              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Start Time</label>
+                  <input
+                    type="datetime-local"
+                    value={moment(selectedShift.start).format('YYYY-MM-DDTHH:mm')}
+                    onChange={e => setSelectedShift({ ...selectedShift, start: new Date(e.target.value) })}
+                    className="w-full border border-gray-300 rounded-lg p-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">End Time</label>
+                  <input
+                    type="datetime-local"
+                    value={moment(selectedShift.end).format('YYYY-MM-DDTHH:mm')}
+                    onChange={e => setSelectedShift({ ...selectedShift, end: new Date(e.target.value) })}
+                    className="w-full border border-gray-300 rounded-lg p-2 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
+                <textarea
+                  value={selectedShift.notes || ''}
+                  onChange={e => setSelectedShift({ ...selectedShift, notes: e.target.value })}
+                  placeholder="Add details (e.g. late arrival, expenses)..."
+                  className="w-full border border-gray-300 rounded-lg p-2 text-sm h-20 resize-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg border border-gray-200">
+                <div className="flex items-center gap-2">
+                  <DollarSign size={16} className="text-gray-500" />
+                  <span className="text-sm font-medium text-gray-700">Mark as Paid</span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={selectedShift.isPaid}
+                    onChange={e => setSelectedShift({ ...selectedShift, isPaid: e.target.checked })}
+                    className="sr-only peer" 
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                </label>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-gray-100 flex gap-3 bg-gray-50">
+              {selectedShift.id && (
+                <button 
+                  onClick={deleteShift}
+                  className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                  title="Delete Shift"
+                >
+                  <Trash2 size={20} />
+                </button>
+              )}
+              <div className="flex-1 flex gap-3 justify-end">
+                <button 
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2 text-gray-600 font-medium hover:bg-gray-200 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={saveShift}
+                  className="px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm flex items-center gap-2"
+                >
+                  <Check size={18} />
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
