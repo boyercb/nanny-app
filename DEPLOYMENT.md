@@ -33,9 +33,15 @@
      - `NEXTAUTH_SECRET`: Generate one (run `openssl rand -base64 32` in terminal or use a random string).
      - `NEXTAUTH_URL`: Your Vercel URL (e.g., `https://nanny-app.vercel.app`). Vercel usually sets this automatically but good to be sure.
      - `MY_EMAIL`: Your email address (User 1).
-     - `MY_PASSWORD`: Your desired password (User 1).
+     - `MY_PASSWORD`: The **HASHED** version of your password (User 1).
      - `WIFE_EMAIL`: Your wife's email address (User 2).
-     - `WIFE_PASSWORD`: Your wife's desired password (User 2).
+     - `WIFE_PASSWORD`: The **HASHED** version of your wife's password (User 2).
+
+   > **How to generate a password hash:**
+   > 1. Run `node scripts/generate-hash.js` in your local terminal.
+   > 2. Enter your desired password.
+   > 3. Copy the output string (it will look like `$2a$10$....`).
+   > 4. Paste that string as the value for `MY_PASSWORD` or `WIFE_PASSWORD`.
 
 6. **Redeploy**:
    - Go to **Deployments** and redeploy the latest commit to pick up the new variables.
