@@ -1,0 +1,35 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Install Dependencies",
+			"type": "shell",
+			"command": "npm install",
+			"group": "build"
+		},
+		{
+			"label": "Prisma Generate",
+			"type": "shell",
+			"command": "npx prisma generate",
+			"dependsOn": ["Install Dependencies"]
+		},
+		{
+			"label": "Prisma DB Push",
+			"type": "shell",
+			"command": "npx prisma db push",
+			"dependsOn": ["Prisma Generate"]
+		},
+		{
+			"label": "Start Dev Server",
+			"type": "shell",
+			"command": "npm run dev",
+			"isBackground": true,
+			"problemMatcher": ["$tsc-watch"],
+			"dependsOn": ["Prisma DB Push"],
+			"group": {
+				"kind": "test",
+				"isDefault": true
+			}
+		}
+	]
+}
