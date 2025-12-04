@@ -262,9 +262,12 @@ export default function CalendarComponent() {
   }
 
   const eventTitleAccessor = (event: Shift) => {
-    const start = moment(event.start).format('h:mma')
-    const end = moment(event.end).format('h:mma')
-    return `${event.title || 'Shift'} ${start} to ${end}`
+    if (view === Views.MONTH) {
+      const start = moment(event.start).format('h:mma')
+      const end = moment(event.end).format('h:mma')
+      return `${event.title || 'Shift'} ${start} to ${end}`
+    }
+    return event.title || 'Shift'
   }
 
   return (
