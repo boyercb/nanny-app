@@ -81,8 +81,8 @@ export default function CalendarComponent() {
     [hourlyRate]
   )
 
-  const handleSelectEvent = useCallback((event: Shift) => {
-    setSelectedShift(event)
+  const handleSelectEvent = useCallback((event: any) => {
+    setSelectedShift(event as Shift)
     setIsModalOpen(true)
   }, [])
 
