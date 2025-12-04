@@ -57,19 +57,9 @@ const handler = NextAuth({
 
           // Check User 1
           if (user1.email && inputEmail === user1.email.toLowerCase().trim()) {
-            console.log("Found User 1 match by email");
-            if (!user1.passwordHash) {
-              console.error("User 1 password hash missing in env");
-              return null;
-            }
-            
-            console.log("Debug Info:");
-            console.log("- Input password length:", credentials.password.length);
-            console.log("- Stored hash length:", user1.passwordHash.length);
-            console.log("- Stored hash prefix:", user1.passwordHash.substring(0, 10));
+            if (!user1.passwordHash) return null;
             
             const isValid = await bcrypt.compare(credentials.password, user1.passwordHash)
-            console.log("User 1 password valid:", isValid);
             if (isValid) {
               return { id: user1.id, name: user1.name, email: user1.email }
             }
@@ -77,19 +67,14 @@ const handler = NextAuth({
           
           // Check User 2
           if (user2.email && inputEmail === user2.email.toLowerCase().trim()) {
-            console.log("Found User 2 match by email");
-            if (!user2.passwordHash) {
-              console.error("User 2 password hash missing in env");
-              return null;
-            }
+            if (!user2.passwordHash) return null;
+            
             const isValid = await bcrypt.compare(credentials.password, user2.passwordHash)
-            console.log("User 2 password valid:", isValid);
             if (isValid) {
               return { id: user2.id, name: user2.name, email: user2.email }
             }
           }
 
-          console.log("No matching user found or invalid password");
           return null
         } catch (error) {
           console.error("Auth error:", error);
@@ -98,7 +83,6 @@ const handler = NextAuth({
       }
     })
   ],
-  debug: true, // Enable NextAuth debugging
 })
 
 export { handler as GET, handler as POST }
