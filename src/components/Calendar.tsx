@@ -84,7 +84,7 @@ export default function CalendarComponent() {
     []
   )
 
-  const handleSelectEvent = useCallback((event: Shift) => {
+  const handleSelectEvent = useCallback((event: any) => {
       if(confirm('Delete this shift?')) {
           setEvents(prev => prev.filter(e => e.id !== event.id))
           fetch(`/api/shifts/${event.id}`, { method: 'DELETE' })
