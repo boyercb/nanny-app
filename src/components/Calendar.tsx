@@ -222,9 +222,10 @@ export default function CalendarComponent() {
 
   // --- Render Helpers ---
 
-  const eventStyleGetter = (event: Shift) => {
+  const eventStyleGetter = (event: any) => {
+    const shift = event as Shift
     const style = {
-      backgroundColor: event.isPaid ? '#10B981' : '#3B82F6', // Green if paid, Blue if not
+      backgroundColor: shift.isPaid ? '#10B981' : '#3B82F6', // Green if paid, Blue if not
       borderRadius: '4px',
       opacity: 0.8,
       color: 'white',
