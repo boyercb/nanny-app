@@ -295,7 +295,7 @@ export default function CalendarComponent() {
     let backgroundColor = '#3B82F6' // Default Blue
     
     if (shift.type === 'SICK') {
-      backgroundColor = '#EF4444' // Red
+      backgroundColor = '#6B7280' // Gray
     } else if (shift.type === 'VACATION') {
       backgroundColor = '#8B5CF6' // Purple
     } else if (shift.isPaid) {
@@ -349,19 +349,27 @@ export default function CalendarComponent() {
   }, [filteredEvents, view])
 
   const monthlyStats = useMemo(() => {
-    const stats: Record<string, { name: string, hours: number, pay: number }> = {}
+    const stats: Record<string, { name: string, workHours: number, sickHours: number, vacationHours: number, totalHours: number, pay: number }> = {}
     
     events.forEach(e => {
       const monthKey = moment(e.start).format('YYYY-MM')
       if (!stats[monthKey]) {
         stats[monthKey] = {
           name: moment(e.start).format('MMM YYYY'),
-          hours: 0,
+          workHours: 0,
+          sickHours: 0,
+          vacationHours: 0,
+          totalHours: 0,
           pay: 0
         }
       }
       const duration = (e.end.getTime() - e.start.getTime()) / (1000 * 60 * 60)
-      stats[monthKey].hours += duration
+      
+      if (e.type === 'SICK') stats[monthKey].sickHours += duration
+      else if (e.type === 'VACATION') stats[monthKey].vacationHours += duration
+      else stats[monthKey].workHours += duration
+
+      stats[monthKey].totalHours += duration
       stats[monthKey].pay += duration * e.hourlyRate
     })
     
@@ -479,14 +487,14 @@ export default function CalendarComponent() {
             
             {/* Leave Tracking */}
             <div className="mb-8 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-red-50 rounded-xl p-4 border border-red-100">
+              <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
                 <div className="flex justify-between items-start mb-2">
-                  <div className="flex items-center gap-2 text-red-700 font-bold">
+                  <div className="flex items-center gap-2 text-gray-700 font-bold">
                     <Thermometer size={18} />
                     Sick Days
                   </div>
                   {!isNanny && (
-                     <div className="flex items-center gap-1 text-xs text-red-600 bg-white px-2 py-1 rounded border border-red-100">
+                     <div className="flex items-center gap-1 text-xs text-gray-600 bg-white px-2 py-1 rounded border border-gray-200">
                         <span>Limit:</span>
                         <input 
                           type="number" 
@@ -498,16 +506,16 @@ export default function CalendarComponent() {
                   )}
                 </div>
                 <div className="flex items-end gap-2">
-                  <span className="text-3xl font-bold text-red-800">{leaveStats.sick}</span>
-                  <span className="text-sm text-red-600 mb-1">used of {sickDaysAllowance}</span>
+                  <span className="text-3xl font-bold text-gray-800">{leaveStats.sick}</span>
+                  <span className="text-sm text-gray-600 mb-1">used of {sickDaysAllowance}</span>
                 </div>
-                <div className="w-full bg-red-200 h-2 rounded-full mt-3 overflow-hidden">
+                <div className="w-full bg-gray-200 h-2 rounded-full mt-3 overflow-hidden">
                   <div 
-                    className="bg-red-500 h-full rounded-full transition-all duration-500" 
+                    className="bg-gray-500 h-full rounded-full transition-all duration-500" 
                     style={{ width: `${Math.min((leaveStats.sick / sickDaysAllowance) * 100, 100)}%` }}
                   />
                 </div>
-                <div className="text-xs text-red-500 mt-2 font-medium">
+                <div className="text-xs text-gray-500 mt-2 font-medium">
                   {Math.max(sickDaysAllowance - leaveStats.sick, 0)} days remaining
                 </div>
               </div>
@@ -556,8 +564,10 @@ export default function CalendarComponent() {
                   <YAxis yAxisId="right" orientation="right" stroke="#82ca9d" />
                   <Tooltip />
                   <Legend />
-                  <Bar yAxisId="left" dataKey="hours" name="Hours" fill="#8884d8" />
-                  <Bar yAxisId="right" dataKey="pay" name="Pay ($)" fill="#82ca9d" />
+                  <Bar yAxisId="left" dataKey="workHours" name="Work Hours" stackId="a" fill="#3B82F6" />
+                  <Bar yAxisId="left" dataKey="sickHours" name="Sick Hours" stackId="a" fill="#6B7280" />
+                  <Bar yAxisId="left" dataKey="vacationHours" name="Vacation Hours" stackId="a" fill="#8B5CF6" />
+                  <Bar yAxisId="right" dataKey="pay" name="Pay ($)" fill="#10B981" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -577,7 +587,7 @@ export default function CalendarComponent() {
                     {monthlyStats.map((stat) => (
                       <tr key={stat.name}>
                         <td className="p-3 font-medium">{stat.name}</td>
-                        <td className="p-3">{stat.hours.toFixed(2)}</td>
+                        <td className="p-3">{stat.totalHours.toFixed(2)}</td>
                         <td className="p-3">${stat.pay.toFixed(2)}</td>
                       </tr>
                     ))}
@@ -714,7 +724,7 @@ export default function CalendarComponent() {
                   </button>
                   <button
                     onClick={() => setSelectedShift({ ...selectedShift, type: 'SICK', title: 'Sick Day' })}
-                    className={`flex-1 py-2 px-3 rounded-lg border text-sm font-medium flex items-center justify-center gap-2 transition-colors ${selectedShift.type === 'SICK' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                    className={`flex-1 py-2 px-3 rounded-lg border text-sm font-medium flex items-center justify-center gap-2 transition-colors ${selectedShift.type === 'SICK' ? 'bg-gray-100 border-gray-300 text-gray-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
                   >
                     <Thermometer size={16} />
                     Sick
