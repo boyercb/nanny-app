@@ -324,7 +324,7 @@ export default function CalendarComponent() {
       <div className="bg-white border-b border-gray-200 p-4 shadow-sm z-10">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="flex items-center gap-3">
-            <h1 className="text-xl md:text-2xl font-bold text-gray-800">Nanny Tracker</h1>
+            <h1 className="text-xl md:text-2xl font-bold text-gray-800">Nanny Shift Tracker</h1>
             <div className="flex bg-gray-100 rounded-lg p-1">
               <button
                 onClick={() => { setViewMode('calendar'); setShowStats(false); }}
