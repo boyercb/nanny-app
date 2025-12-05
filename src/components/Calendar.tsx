@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Calendar, momentLocalizer, Views } from 'react-big-calendar'
 import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop'
 import moment from 'moment'
-import { Download, List, Calendar as CalendarIcon, Check, X, Trash2, DollarSign, Clock, BarChart3 } from 'lucide-react'
+import { Download, List, Calendar as CalendarIcon, Check, X, Trash2, DollarSign, Clock, BarChart3, Briefcase, Thermometer, Palmtree } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
@@ -22,6 +22,7 @@ interface Shift {
   hourlyRate: number
   isPaid: boolean
   notes?: string
+  type: 'WORK' | 'SICK' | 'VACATION'
 }
 
 export default function CalendarComponent() {
@@ -30,6 +31,8 @@ export default function CalendarComponent() {
 
   const [events, setEvents] = useState<Shift[]>([])
   const [hourlyRate, setHourlyRate] = useState(25)
+  const [sickDaysAllowance, setSickDaysAllowance] = useState(5)
+  const [vacationDaysAllowance, setVacationDaysAllowance] = useState(10)
   const [view, setView] = useState<any>(Views.WEEK)
   const [date, setDate] = useState(new Date())
   const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar')
@@ -47,7 +50,8 @@ export default function CalendarComponent() {
         const formatted = data.map((e: any) => ({
           ...e,
           start: new Date(e.start),
-          end: new Date(e.end)
+          end: new Date(e.end),
+          type: e.type || 'WORK'
         }))
         setEvents(formatted)
       })
@@ -55,8 +59,10 @@ export default function CalendarComponent() {
     fetch('/api/config')
       .then(res => res.json())
       .then(data => {
-        if (data && data.hourlyRate) {
-          setHourlyRate(data.hourlyRate)
+        if (data) {
+          if (data.hourlyRate) setHourlyRate(data.hourlyRate)
+          if (data.sickDaysAllowance) setSickDaysAllowance(data.sickDaysAllowance)
+          if (data.vacationDaysAllowance) setVacationDaysAllowance(data.vacationDaysAllowance)
         }
       })
   }, [])
@@ -71,6 +77,17 @@ export default function CalendarComponent() {
     })
   }
 
+  const handleAllowanceChange = (key: 'sickDaysAllowance' | 'vacationDaysAllowance', value: number) => {
+    if (key === 'sickDaysAllowance') setSickDaysAllowance(value)
+    if (key === 'vacationDaysAllowance') setVacationDaysAllowance(value)
+    
+    fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [key]: value }),
+    })
+  }
+
   // --- Calendar Handlers ---
 
   const handleSelectSlot = useCallback(
@@ -81,7 +98,8 @@ export default function CalendarComponent() {
         title: 'Nanny Shift',
         hourlyRate,
         isPaid: false,
-        notes: ''
+        notes: '',
+        type: 'WORK'
       })
       setIsModalOpen(true)
     },
@@ -274,8 +292,18 @@ export default function CalendarComponent() {
 
   const eventStyleGetter = (event: any) => {
     const shift = event as Shift
+    let backgroundColor = '#3B82F6' // Default Blue
+    
+    if (shift.type === 'SICK') {
+      backgroundColor = '#EF4444' // Red
+    } else if (shift.type === 'VACATION') {
+      backgroundColor = '#8B5CF6' // Purple
+    } else if (shift.isPaid) {
+      backgroundColor = '#10B981' // Green if paid
+    }
+
     const style = {
-      backgroundColor: shift.isPaid ? '#10B981' : '#3B82F6', // Green if paid, Blue if not
+      backgroundColor,
       borderRadius: '4px',
       opacity: 0.8,
       color: 'white',
@@ -338,6 +366,16 @@ export default function CalendarComponent() {
     })
     
     return Object.values(stats).sort((a, b) => moment(a.name, 'MMM YYYY').toDate().getTime() - moment(b.name, 'MMM YYYY').toDate().getTime())
+  }, [events])
+
+  const leaveStats = useMemo(() => {
+    const currentYear = new Date().getFullYear()
+    const thisYearEvents = events.filter(e => e.start.getFullYear() === currentYear)
+    
+    const sick = thisYearEvents.filter(e => e.type === 'SICK').length
+    const vacation = thisYearEvents.filter(e => e.type === 'VACATION').length
+    
+    return { sick, vacation }
   }, [events])
 
   return (
@@ -438,6 +476,76 @@ export default function CalendarComponent() {
       <div className="flex-1 overflow-hidden p-4 flex flex-col gap-4">
         {showStats ? (
           <div className="h-full bg-white rounded-xl shadow-sm border border-gray-200 p-6 overflow-y-auto">
+            
+            {/* Leave Tracking */}
+            <div className="mb-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-red-50 rounded-xl p-4 border border-red-100">
+                <div className="flex justify-between items-start mb-2">
+                  <div className="flex items-center gap-2 text-red-700 font-bold">
+                    <Thermometer size={18} />
+                    Sick Days
+                  </div>
+                  {!isNanny && (
+                     <div className="flex items-center gap-1 text-xs text-red-600 bg-white px-2 py-1 rounded border border-red-100">
+                        <span>Limit:</span>
+                        <input 
+                          type="number" 
+                          value={sickDaysAllowance} 
+                          onChange={(e) => handleAllowanceChange('sickDaysAllowance', parseInt(e.target.value))}
+                          className="w-8 text-center font-bold focus:outline-none"
+                        />
+                     </div>
+                  )}
+                </div>
+                <div className="flex items-end gap-2">
+                  <span className="text-3xl font-bold text-red-800">{leaveStats.sick}</span>
+                  <span className="text-sm text-red-600 mb-1">used of {sickDaysAllowance}</span>
+                </div>
+                <div className="w-full bg-red-200 h-2 rounded-full mt-3 overflow-hidden">
+                  <div 
+                    className="bg-red-500 h-full rounded-full transition-all duration-500" 
+                    style={{ width: `${Math.min((leaveStats.sick / sickDaysAllowance) * 100, 100)}%` }}
+                  />
+                </div>
+                <div className="text-xs text-red-500 mt-2 font-medium">
+                  {Math.max(sickDaysAllowance - leaveStats.sick, 0)} days remaining
+                </div>
+              </div>
+
+              <div className="bg-purple-50 rounded-xl p-4 border border-purple-100">
+                <div className="flex justify-between items-start mb-2">
+                  <div className="flex items-center gap-2 text-purple-700 font-bold">
+                    <Palmtree size={18} />
+                    Vacation Days
+                  </div>
+                  {!isNanny && (
+                     <div className="flex items-center gap-1 text-xs text-purple-600 bg-white px-2 py-1 rounded border border-purple-100">
+                        <span>Limit:</span>
+                        <input 
+                          type="number" 
+                          value={vacationDaysAllowance} 
+                          onChange={(e) => handleAllowanceChange('vacationDaysAllowance', parseInt(e.target.value))}
+                          className="w-8 text-center font-bold focus:outline-none"
+                        />
+                     </div>
+                  )}
+                </div>
+                <div className="flex items-end gap-2">
+                  <span className="text-3xl font-bold text-purple-800">{leaveStats.vacation}</span>
+                  <span className="text-sm text-purple-600 mb-1">used of {vacationDaysAllowance}</span>
+                </div>
+                <div className="w-full bg-purple-200 h-2 rounded-full mt-3 overflow-hidden">
+                  <div 
+                    className="bg-purple-500 h-full rounded-full transition-all duration-500" 
+                    style={{ width: `${Math.min((leaveStats.vacation / vacationDaysAllowance) * 100, 100)}%` }}
+                  />
+                </div>
+                <div className="text-xs text-purple-500 mt-2 font-medium">
+                  {Math.max(vacationDaysAllowance - leaveStats.vacation, 0)} days remaining
+                </div>
+              </div>
+            </div>
+
             <h2 className="text-lg font-bold text-gray-800 mb-6">Monthly Summary</h2>
             <div className="h-[400px] w-full">
               <ResponsiveContainer width="100%" height="100%">
@@ -594,6 +702,33 @@ export default function CalendarComponent() {
             </div>
             
             <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Shift Type</label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setSelectedShift({ ...selectedShift, type: 'WORK', title: 'Nanny Shift' })}
+                    className={`flex-1 py-2 px-3 rounded-lg border text-sm font-medium flex items-center justify-center gap-2 transition-colors ${selectedShift.type === 'WORK' ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                  >
+                    <Briefcase size={16} />
+                    Work
+                  </button>
+                  <button
+                    onClick={() => setSelectedShift({ ...selectedShift, type: 'SICK', title: 'Sick Day' })}
+                    className={`flex-1 py-2 px-3 rounded-lg border text-sm font-medium flex items-center justify-center gap-2 transition-colors ${selectedShift.type === 'SICK' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                  >
+                    <Thermometer size={16} />
+                    Sick
+                  </button>
+                  <button
+                    onClick={() => setSelectedShift({ ...selectedShift, type: 'VACATION', title: 'Vacation' })}
+                    className={`flex-1 py-2 px-3 rounded-lg border text-sm font-medium flex items-center justify-center gap-2 transition-colors ${selectedShift.type === 'VACATION' ? 'bg-purple-50 border-purple-200 text-purple-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                  >
+                    <Palmtree size={16} />
+                    Vacation
+                  </button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Start Time</label>
