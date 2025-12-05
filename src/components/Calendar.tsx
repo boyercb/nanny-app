@@ -31,8 +31,8 @@ export default function CalendarComponent() {
 
   const [events, setEvents] = useState<Shift[]>([])
   const [hourlyRate, setHourlyRate] = useState(25)
-  const [sickDaysAllowance, setSickDaysAllowance] = useState(5)
-  const [vacationDaysAllowance, setVacationDaysAllowance] = useState(10)
+  const [sickHoursAllowance, setSickHoursAllowance] = useState(-1)
+  const [vacationHoursAllowance, setVacationHoursAllowance] = useState(42)
   const [view, setView] = useState<any>(Views.WEEK)
   const [date, setDate] = useState(new Date())
   const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar')
@@ -61,8 +61,8 @@ export default function CalendarComponent() {
       .then(data => {
         if (data) {
           if (data.hourlyRate) setHourlyRate(data.hourlyRate)
-          if (data.sickDaysAllowance) setSickDaysAllowance(data.sickDaysAllowance)
-          if (data.vacationDaysAllowance) setVacationDaysAllowance(data.vacationDaysAllowance)
+          if (data.sickHoursAllowance !== undefined) setSickHoursAllowance(data.sickHoursAllowance)
+          if (data.vacationHoursAllowance !== undefined) setVacationHoursAllowance(data.vacationHoursAllowance)
         }
       })
   }, [])
@@ -77,9 +77,9 @@ export default function CalendarComponent() {
     })
   }
 
-  const handleAllowanceChange = (key: 'sickDaysAllowance' | 'vacationDaysAllowance', value: number) => {
-    if (key === 'sickDaysAllowance') setSickDaysAllowance(value)
-    if (key === 'vacationDaysAllowance') setVacationDaysAllowance(value)
+  const handleAllowanceChange = (key: 'sickHoursAllowance' | 'vacationHoursAllowance', value: number) => {
+    if (key === 'sickHoursAllowance') setSickHoursAllowance(value)
+    if (key === 'vacationHoursAllowance') setVacationHoursAllowance(value)
     
     fetch('/api/config', {
       method: 'POST',
@@ -380,8 +380,8 @@ export default function CalendarComponent() {
     const currentYear = new Date().getFullYear()
     const thisYearEvents = events.filter(e => e.start.getFullYear() === currentYear)
     
-    const sick = thisYearEvents.filter(e => e.type === 'SICK').length
-    const vacation = thisYearEvents.filter(e => e.type === 'VACATION').length
+    const sick = thisYearEvents.filter(e => e.type === 'SICK').reduce((acc, e) => acc + (e.end.getTime() - e.start.getTime()) / (1000 * 60 * 60), 0)
+    const vacation = thisYearEvents.filter(e => e.type === 'VACATION').reduce((acc, e) => acc + (e.end.getTime() - e.start.getTime()) / (1000 * 60 * 60), 0)
     
     return { sick, vacation }
   }, [events])
@@ -491,32 +491,38 @@ export default function CalendarComponent() {
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex items-center gap-2 text-gray-700 font-bold">
                     <Thermometer size={18} />
-                    Sick Days
+                    Sick Time
                   </div>
                   {!isNanny && (
                      <div className="flex items-center gap-1 text-xs text-gray-600 bg-white px-2 py-1 rounded border border-gray-200">
                         <span>Limit:</span>
                         <input 
                           type="number" 
-                          value={sickDaysAllowance} 
-                          onChange={(e) => handleAllowanceChange('sickDaysAllowance', parseInt(e.target.value))}
-                          className="w-8 text-center font-bold focus:outline-none"
+                          value={sickHoursAllowance === -1 ? '' : sickHoursAllowance} 
+                          placeholder="∞"
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? -1 : parseInt(e.target.value)
+                            handleAllowanceChange('sickHoursAllowance', val)
+                          }}
+                          className="w-12 text-center font-bold focus:outline-none"
                         />
                      </div>
                   )}
                 </div>
                 <div className="flex items-end gap-2">
-                  <span className="text-3xl font-bold text-gray-800">{leaveStats.sick}</span>
-                  <span className="text-sm text-gray-600 mb-1">used of {sickDaysAllowance}</span>
+                  <span className="text-3xl font-bold text-gray-800">{leaveStats.sick.toFixed(1)}</span>
+                  <span className="text-sm text-gray-600 mb-1">hours used {sickHoursAllowance !== -1 && `of ${sickHoursAllowance}`}</span>
                 </div>
-                <div className="w-full bg-gray-200 h-2 rounded-full mt-3 overflow-hidden">
-                  <div 
-                    className="bg-gray-500 h-full rounded-full transition-all duration-500" 
-                    style={{ width: `${Math.min((leaveStats.sick / sickDaysAllowance) * 100, 100)}%` }}
-                  />
-                </div>
+                {sickHoursAllowance !== -1 && (
+                  <div className="w-full bg-gray-200 h-2 rounded-full mt-3 overflow-hidden">
+                    <div 
+                      className="bg-gray-500 h-full rounded-full transition-all duration-500" 
+                      style={{ width: `${Math.min((leaveStats.sick / sickHoursAllowance) * 100, 100)}%` }}
+                    />
+                  </div>
+                )}
                 <div className="text-xs text-gray-500 mt-2 font-medium">
-                  {Math.max(sickDaysAllowance - leaveStats.sick, 0)} days remaining
+                  {sickHoursAllowance === -1 ? 'Unlimited' : `${Math.max(sickHoursAllowance - leaveStats.sick, 0).toFixed(1)} hours remaining`}
                 </div>
               </div>
 
@@ -524,32 +530,32 @@ export default function CalendarComponent() {
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex items-center gap-2 text-purple-700 font-bold">
                     <Palmtree size={18} />
-                    Vacation Days
+                    Vacation Time
                   </div>
                   {!isNanny && (
                      <div className="flex items-center gap-1 text-xs text-purple-600 bg-white px-2 py-1 rounded border border-purple-100">
                         <span>Limit:</span>
                         <input 
                           type="number" 
-                          value={vacationDaysAllowance} 
-                          onChange={(e) => handleAllowanceChange('vacationDaysAllowance', parseInt(e.target.value))}
-                          className="w-8 text-center font-bold focus:outline-none"
+                          value={vacationHoursAllowance} 
+                          onChange={(e) => handleAllowanceChange('vacationHoursAllowance', parseInt(e.target.value))}
+                          className="w-12 text-center font-bold focus:outline-none"
                         />
                      </div>
                   )}
                 </div>
                 <div className="flex items-end gap-2">
-                  <span className="text-3xl font-bold text-purple-800">{leaveStats.vacation}</span>
-                  <span className="text-sm text-purple-600 mb-1">used of {vacationDaysAllowance}</span>
+                  <span className="text-3xl font-bold text-purple-800">{leaveStats.vacation.toFixed(1)}</span>
+                  <span className="text-sm text-purple-600 mb-1">hours used of {vacationHoursAllowance}</span>
                 </div>
                 <div className="w-full bg-purple-200 h-2 rounded-full mt-3 overflow-hidden">
                   <div 
                     className="bg-purple-500 h-full rounded-full transition-all duration-500" 
-                    style={{ width: `${Math.min((leaveStats.vacation / vacationDaysAllowance) * 100, 100)}%` }}
+                    style={{ width: `${Math.min((leaveStats.vacation / vacationHoursAllowance) * 100, 100)}%` }}
                   />
                 </div>
                 <div className="text-xs text-purple-500 mt-2 font-medium">
-                  {Math.max(vacationDaysAllowance - leaveStats.vacation, 0)} days remaining
+                  {Math.max(vacationHoursAllowance - leaveStats.vacation, 0).toFixed(1)} hours remaining
                 </div>
               </div>
             </div>

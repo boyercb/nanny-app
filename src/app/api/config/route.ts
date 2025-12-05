@@ -20,12 +20,12 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const body = await request.json()
-  const { hourlyRate, sickDaysAllowance, vacationDaysAllowance } = body
+  const { hourlyRate, sickHoursAllowance, vacationHoursAllowance } = body
 
   const updateData: any = {}
   if (hourlyRate !== undefined) updateData.hourlyRate = parseFloat(hourlyRate)
-  if (sickDaysAllowance !== undefined) updateData.sickDaysAllowance = parseInt(sickDaysAllowance)
-  if (vacationDaysAllowance !== undefined) updateData.vacationDaysAllowance = parseInt(vacationDaysAllowance)
+  if (sickHoursAllowance !== undefined) updateData.sickHoursAllowance = parseInt(sickHoursAllowance)
+  if (vacationHoursAllowance !== undefined) updateData.vacationHoursAllowance = parseInt(vacationHoursAllowance)
 
   const config = await prisma.config.upsert({
     where: { id: 1 },
@@ -33,8 +33,8 @@ export async function POST(request: Request) {
     create: { 
       id: 1,
       hourlyRate: hourlyRate || 25,
-      sickDaysAllowance: sickDaysAllowance || 5,
-      vacationDaysAllowance: vacationDaysAllowance || 10
+      sickHoursAllowance: sickHoursAllowance || -1,
+      vacationHoursAllowance: vacationHoursAllowance || 42
     }
   })
 

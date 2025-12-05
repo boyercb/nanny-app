@@ -22,6 +22,6 @@ model Shift {
 model Config {
   id         Int      @id @default(1)
   hourlyRate Float    @default(25)
-  sickDaysAllowance Int @default(5)
-  vacationDaysAllowance Int @default(10)
+  sickHoursAllowance Int @default(-1)
+  vacationHoursAllowance Int @default(42)
 }
