@@ -164,7 +164,7 @@ export default function CalendarComponent() {
           toast.success("Shift deleted")
         }
       },
-      cancel: { label: "Cancel" },
+      cancel: { label: "Cancel", onClick: () => {} },
       duration: 5000
     })
   }
@@ -266,7 +266,7 @@ export default function CalendarComponent() {
           toast.success(`Marked ${unpaidIds.length} shifts as paid`)
         }
       },
-      cancel: { label: "Cancel" }
+      cancel: { label: "Cancel", onClick: () => {} }
     })
   }
 
