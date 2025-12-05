@@ -5,6 +5,8 @@ import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop'
 import moment from 'moment'
 import { Download, List, Calendar as CalendarIcon, Check, X, Trash2, DollarSign, Clock, BarChart3 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { useSession } from 'next-auth/react'
+import { toast } from 'sonner'
 import 'react-big-calendar/lib/addons/dragAndDrop/styles.css'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
 
@@ -23,6 +25,9 @@ interface Shift {
 }
 
 export default function CalendarComponent() {
+  const { data: session } = useSession()
+  const isNanny = session?.user?.name === 'Nanny'
+
   const [events, setEvents] = useState<Shift[]>([])
   const [hourlyRate, setHourlyRate] = useState(25)
   const [view, setView] = useState<any>(Views.WEEK)
@@ -147,11 +152,21 @@ export default function CalendarComponent() {
 
   const deleteShift = async () => {
     if (!selectedShift?.id) return
-    if (!confirm('Delete this shift?')) return
-
-    await fetch(`/api/shifts/${selectedShift.id}`, { method: 'DELETE' })
-    setEvents(prev => prev.filter(e => e.id !== selectedShift.id))
-    setIsModalOpen(false)
+    
+    toast("Delete this shift?", {
+      action: {
+        label: "Delete",
+        onClick: async () => {
+          if (!selectedShift.id) return
+          await fetch(`/api/shifts/${selectedShift.id}`, { method: 'DELETE' })
+          setEvents(prev => prev.filter(e => e.id !== selectedShift.id))
+          setIsModalOpen(false)
+          toast.success("Shift deleted")
+        }
+      },
+      cancel: { label: "Cancel" },
+      duration: 5000
+    })
   }
 
   // --- Export ---
@@ -231,21 +246,28 @@ export default function CalendarComponent() {
     const unpaidIds = filteredEvents.filter(e => !e.isPaid && e.id).map(e => e.id)
     
     if (unpaidIds.length === 0) {
-        alert("All shifts in this view are already paid!")
+        toast.info("All shifts in this view are already paid!")
         return
     }
 
-    if (!confirm(`Mark ${unpaidIds.length} shifts as paid?`)) return
+    toast("Mark all visible shifts as paid?", {
+      action: {
+        label: "Confirm",
+        onClick: async () => {
+          await fetch('/api/shifts/bulk', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: unpaidIds, data: { isPaid: true } }),
+          })
 
-    await fetch('/api/shifts/bulk', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids: unpaidIds, data: { isPaid: true } }),
+          setEvents(prev => prev.map(e => 
+              e.id && unpaidIds.includes(e.id) ? { ...e, isPaid: true } : e
+          ))
+          toast.success(`Marked ${unpaidIds.length} shifts as paid`)
+        }
+      },
+      cancel: { label: "Cancel" }
     })
-
-    setEvents(prev => prev.map(e => 
-        e.id && unpaidIds.includes(e.id) ? { ...e, isPaid: true } : e
-    ))
   }
 
   // --- Render Helpers ---
@@ -348,28 +370,32 @@ export default function CalendarComponent() {
           </div>
 
           <div className="flex flex-wrap gap-4 items-center w-full md:w-auto">
-            <div className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
-              <span className="text-sm text-gray-500">Rate:</span>
-              <div className="flex items-center">
-                <span className="text-gray-400">$</span>
-                <input
-                  type="number"
-                  value={hourlyRate}
-                  onChange={handleRateChange}
-                  className="w-12 bg-transparent text-right font-medium focus:outline-none"
-                />
-                <span className="text-gray-400">/hr</span>
+            {!isNanny && (
+              <div className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
+                <span className="text-sm text-gray-500">Rate:</span>
+                <div className="flex items-center">
+                  <span className="text-gray-400">$</span>
+                  <input
+                    type="number"
+                    value={hourlyRate}
+                    onChange={handleRateChange}
+                    className="w-12 bg-transparent text-right font-medium focus:outline-none"
+                  />
+                  <span className="text-gray-400">/hr</span>
+                </div>
               </div>
-            </div>
+            )}
 
-            <button 
-              onClick={markAllAsPaid}
-              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100"
-              title="Mark all visible shifts as paid"
-            >
-              <Check size={16} />
-              Mark all as Paid
-            </button>
+            {!isNanny && (
+              <button 
+                onClick={markAllAsPaid}
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100"
+                title="Mark all visible shifts as paid"
+              >
+                <Check size={16} />
+                Mark all as Paid
+              </button>
+            )}
 
             <button 
               onClick={exportCSV}
@@ -599,21 +625,23 @@ export default function CalendarComponent() {
                 />
               </div>
 
-              <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg border border-gray-200">
-                <div className="flex items-center gap-2">
-                  <DollarSign size={16} className="text-gray-500" />
-                  <span className="text-sm font-medium text-gray-700">Mark as Paid</span>
+              {!isNanny && (
+                <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg border border-gray-200">
+                  <div className="flex items-center gap-2">
+                    <DollarSign size={16} className="text-gray-500" />
+                    <span className="text-sm font-medium text-gray-700">Mark as Paid</span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={selectedShift.isPaid}
+                      onChange={e => setSelectedShift({ ...selectedShift, isPaid: e.target.checked })}
+                      className="sr-only peer" 
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                  </label>
                 </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    checked={selectedShift.isPaid}
-                    onChange={e => setSelectedShift({ ...selectedShift, isPaid: e.target.checked })}
-                    className="sr-only peer" 
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
-                </label>
-              </div>
+              )}
             </div>
 
             <div className="p-4 border-t border-gray-100 flex gap-3 bg-gray-50">
