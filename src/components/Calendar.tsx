@@ -3,7 +3,8 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Calendar, momentLocalizer, Views } from 'react-big-calendar'
 import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop'
 import moment from 'moment'
-import { Download, List, Calendar as CalendarIcon, Check, X, Trash2, DollarSign, Clock } from 'lucide-react'
+import { Download, List, Calendar as CalendarIcon, Check, X, Trash2, DollarSign, Clock, BarChart3 } from 'lucide-react'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import 'react-big-calendar/lib/addons/dragAndDrop/styles.css'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
 
@@ -27,6 +28,7 @@ export default function CalendarComponent() {
   const [view, setView] = useState<any>(Views.WEEK)
   const [date, setDate] = useState(new Date())
   const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar')
+  const [showStats, setShowStats] = useState(false)
   
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -220,7 +222,7 @@ export default function CalendarComponent() {
       return acc + (duration * curr.hourlyRate)
   }, 0)
 
-  const totalOwed = events.filter(e => !e.isPaid).reduce((acc, curr) => {
+  const totalOwed = filteredEvents.filter(e => !e.isPaid).reduce((acc, curr) => {
       const duration = (curr.end.getTime() - curr.start.getTime()) / (1000 * 60 * 60)
       return acc + (duration * curr.hourlyRate)
   }, 0)
@@ -270,25 +272,77 @@ export default function CalendarComponent() {
     return event.title || 'Shift'
   }
 
+  const weeklySummaries = useMemo(() => {
+    if (view !== Views.MONTH) return []
+    
+    const summaries: Record<string, { start: Date, end: Date, hours: number, pay: number, paid: boolean }> = {}
+    
+    filteredEvents.forEach(e => {
+      const weekStart = moment(e.start).startOf('week').format('YYYY-MM-DD')
+      if (!summaries[weekStart]) {
+        summaries[weekStart] = {
+          start: moment(e.start).startOf('week').toDate(),
+          end: moment(e.start).endOf('week').toDate(),
+          hours: 0,
+          pay: 0,
+          paid: true
+        }
+      }
+      
+      const duration = (e.end.getTime() - e.start.getTime()) / (1000 * 60 * 60)
+      summaries[weekStart].hours += duration
+      summaries[weekStart].pay += duration * e.hourlyRate
+      if (!e.isPaid) summaries[weekStart].paid = false
+    })
+
+    return Object.values(summaries).sort((a, b) => a.start.getTime() - b.start.getTime())
+  }, [filteredEvents, view])
+
+  const monthlyStats = useMemo(() => {
+    const stats: Record<string, { name: string, hours: number, pay: number }> = {}
+    
+    events.forEach(e => {
+      const monthKey = moment(e.start).format('YYYY-MM')
+      if (!stats[monthKey]) {
+        stats[monthKey] = {
+          name: moment(e.start).format('MMM YYYY'),
+          hours: 0,
+          pay: 0
+        }
+      }
+      const duration = (e.end.getTime() - e.start.getTime()) / (1000 * 60 * 60)
+      stats[monthKey].hours += duration
+      stats[monthKey].pay += duration * e.hourlyRate
+    })
+    
+    return Object.values(stats).sort((a, b) => moment(a.name, 'MMM YYYY').toDate().getTime() - moment(b.name, 'MMM YYYY').toDate().getTime())
+  }, [events])
+
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
+    <div className="h-screen flex flex-col bg-gray-50 text-xs md:text-sm">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 p-4 shadow-sm z-10">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-gray-800">Nanny Tracker</h1>
+            <h1 className="text-xl md:text-2xl font-bold text-gray-800">Nanny Tracker</h1>
             <div className="flex bg-gray-100 rounded-lg p-1">
               <button
-                onClick={() => setViewMode('calendar')}
-                className={`p-2 rounded-md transition-colors ${viewMode === 'calendar' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                onClick={() => { setViewMode('calendar'); setShowStats(false); }}
+                className={`p-2 rounded-md transition-colors ${!showStats && viewMode === 'calendar' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
               >
                 <CalendarIcon size={20} />
               </button>
               <button
-                onClick={() => setViewMode('list')}
-                className={`p-2 rounded-md transition-colors ${viewMode === 'list' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                onClick={() => { setViewMode('list'); setShowStats(false); }}
+                className={`p-2 rounded-md transition-colors ${!showStats && viewMode === 'list' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
               >
                 <List size={20} />
+              </button>
+              <button
+                onClick={() => setShowStats(true)}
+                className={`p-2 rounded-md transition-colors ${showStats ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                <BarChart3 size={20} />
               </button>
             </div>
           </div>
@@ -355,29 +409,98 @@ export default function CalendarComponent() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-hidden p-4">
-        {viewMode === 'calendar' ? (
-          <div className="h-full bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-            <DnDCalendar
-              localizer={localizer}
-              events={events}
-              defaultView={Views.WEEK}
-              views={[Views.MONTH, Views.WEEK, Views.DAY]}
-              step={30}
-              date={date}
-              view={view}
-              onSelectSlot={handleSelectSlot}
-              onEventDrop={handleEventDrop}
-              onEventResize={handleEventResize}
-              onSelectEvent={handleSelectEvent}
-              selectable
-              resizable
-              style={{ height: '100%' }}
-              onNavigate={(date: Date) => setDate(date)}
-              onView={(view: any) => setView(view)}
-              eventPropGetter={eventStyleGetter}
-              titleAccessor={eventTitleAccessor as any}
-            />
+      <div className="flex-1 overflow-hidden p-4 flex flex-col gap-4">
+        {showStats ? (
+          <div className="h-full bg-white rounded-xl shadow-sm border border-gray-200 p-6 overflow-y-auto">
+            <h2 className="text-lg font-bold text-gray-800 mb-6">Monthly Summary</h2>
+            <div className="h-[400px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={monthlyStats}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis yAxisId="left" orientation="left" stroke="#8884d8" />
+                  <YAxis yAxisId="right" orientation="right" stroke="#82ca9d" />
+                  <Tooltip />
+                  <Legend />
+                  <Bar yAxisId="left" dataKey="hours" name="Hours" fill="#8884d8" />
+                  <Bar yAxisId="right" dataKey="pay" name="Pay ($)" fill="#82ca9d" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            
+            <div className="mt-8">
+              <h3 className="font-bold text-gray-700 mb-4">Details</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-gray-50 text-gray-500">
+                    <tr>
+                      <th className="p-3 rounded-tl-lg">Month</th>
+                      <th className="p-3">Total Hours</th>
+                      <th className="p-3 rounded-tr-lg">Total Pay</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {monthlyStats.map((stat) => (
+                      <tr key={stat.name}>
+                        <td className="p-3 font-medium">{stat.name}</td>
+                        <td className="p-3">{stat.hours.toFixed(2)}</td>
+                        <td className="p-3">${stat.pay.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        ) : viewMode === 'calendar' ? (
+          <div className="flex-1 flex flex-col gap-4 overflow-hidden">
+            <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-200 p-4 min-h-0">
+              <DnDCalendar
+                localizer={localizer}
+                events={events}
+                defaultView={Views.WEEK}
+                views={[Views.MONTH, Views.WEEK, Views.DAY]}
+                step={30}
+                date={date}
+                view={view}
+                onSelectSlot={handleSelectSlot}
+                onEventDrop={handleEventDrop}
+                onEventResize={handleEventResize}
+                onSelectEvent={handleSelectEvent}
+                selectable
+                resizable
+                style={{ height: '100%' }}
+                onNavigate={(date: Date) => setDate(date)}
+                onView={(view: any) => setView(view)}
+                eventPropGetter={eventStyleGetter}
+                titleAccessor={eventTitleAccessor as any}
+              />
+            </div>
+            
+            {/* Weekly Summary for Month View */}
+            {view === Views.MONTH && weeklySummaries.length > 0 && (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 max-h-[200px] overflow-y-auto">
+                <h3 className="text-sm font-bold text-gray-700 mb-3 sticky top-0 bg-white">Weekly Breakdown</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {weeklySummaries.map((week, idx) => (
+                    <div key={idx} className={`p-3 rounded-lg border ${week.paid ? 'bg-green-50 border-green-100' : 'bg-blue-50 border-blue-100'}`}>
+                      <div className="text-xs text-gray-500 mb-1">
+                        {moment(week.start).format('MMM D')} - {moment(week.end).format('MMM D')}
+                      </div>
+                      <div className="flex justify-between items-end">
+                        <div>
+                          <div className="font-bold text-gray-900">${week.pay.toFixed(2)}</div>
+                          <div className="text-xs text-gray-600">{week.hours.toFixed(1)} hrs</div>
+                        </div>
+                        <div className={`text-xs font-bold ${week.paid ? 'text-green-600' : 'text-blue-600'}`}>
+                          {week.paid ? 'PAID' : 'OWED'}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="h-full bg-white rounded-xl shadow-sm border border-gray-200 overflow-y-auto">
