@@ -41,10 +41,15 @@ A simple web app to track nanny hours and calculate weekly pay.
     ```bash
     ICS_FEED_TOKEN="replace-me-with-a-strong-token"
     ```
-2. Deploy/restart, then subscribe to:
-    ```
-    https://<your-domain>/api/ics?token=replace-me-with-a-strong-token
-    ```
+2. Deploy/restart, then subscribe using either form:
+    - Path form (preferred for Apple iCal):
+      ```
+      https://<your-domain>/api/ics/replace-me-with-a-strong-token
+      ```
+    - Query form (works in browsers and Google Calendar):
+      ```
+      https://<your-domain>/api/ics?token=replace-me-with-a-strong-token
+      ```
     In Google Calendar: Other calendars → “From URL”.
     In Apple Calendar: File → New Calendar Subscription.
 
