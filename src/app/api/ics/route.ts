@@ -13,6 +13,18 @@ function escape(text: string) {
     .replace(/\n/g, '\\n')
 }
 
+function foldLine(line: string) {
+  if (line.length <= 74) return line
+  const parts: string[] = []
+  let remaining = line
+  while (remaining.length > 74) {
+    parts.push(remaining.slice(0, 74))
+    remaining = ' ' + remaining.slice(74)
+  }
+  parts.push(remaining)
+  return parts.join('\r\n')
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url)
   const token = url.searchParams.get('token')
@@ -60,7 +72,8 @@ export async function GET(request: Request) {
 
   lines.push('END:VCALENDAR')
 
-  const body = lines.join('\r\n') + '\r\n'
+  const folded = lines.map(foldLine)
+  const body = folded.join('\r\n') + '\r\n'
 
   return new NextResponse(body, {
     status: 200,

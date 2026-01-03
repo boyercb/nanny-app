@@ -13,6 +13,18 @@ function escape(text: string) {
     .replace(/\n/g, '\\n')
 }
 
+function foldLine(line: string) {
+  if (line.length <= 74) return line
+  const parts: string[] = []
+  let remaining = line
+  while (remaining.length > 74) {
+    parts.push(remaining.slice(0, 74))
+    remaining = ' ' + remaining.slice(74)
+  }
+  parts.push(remaining)
+  return parts.join('\r\n')
+}
+
 async function buildICS() {
   const shifts = await prisma.shift.findMany({ orderBy: { start: 'asc' } })
 
@@ -49,7 +61,8 @@ async function buildICS() {
   })
 
   lines.push('END:VCALENDAR')
-  return lines.join('\r\n') + '\r\n'
+  const folded = lines.map(foldLine)
+  return folded.join('\r\n') + '\r\n'
 }
 
 export async function GET(_request: Request, { params }: { params: { token: string } }) {
