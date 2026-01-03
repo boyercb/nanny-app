@@ -33,3 +33,21 @@ A simple web app to track nanny hours and calculate weekly pay.
 - **Weekly Calculation:** Automatically calculates total hours and pay based on the hourly rate.
 - **Historic Data:** Navigate to previous weeks to see past records.
 - **Adjustable Rate:** Change the hourly rate on the fly.
+- **ICS Export:** Subscribe to nanny shifts from Google Calendar or iCal using the feed below.
+
+## ICS Feed (subscribe from Google/Apple Calendar)
+
+1. Set a secret token in `.env`:
+    ```bash
+    ICS_FEED_TOKEN="replace-me-with-a-strong-token"
+    ```
+2. Deploy/restart, then subscribe to:
+    ```
+    https://<your-domain>/api/ics?token=replace-me-with-a-strong-token
+    ```
+    In Google Calendar: Other calendars → “From URL”.
+    In Apple Calendar: File → New Calendar Subscription.
+
+Notes:
+- Feed is read-only; it refreshes periodically (Google/Apple caching rules apply).
+- Shifts are exported in UTC. Colors are managed by the consuming calendar.
