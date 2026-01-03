@@ -33,6 +33,8 @@ export async function GET(request: Request) {
   lines.push('CALSCALE:GREGORIAN')
   lines.push('METHOD:PUBLISH')
   lines.push('X-WR-CALNAME:Nanny Shifts')
+  lines.push('X-WR-TIMEZONE:UTC')
+  lines.push('REFRESH-INTERVAL;VALUE=DURATION:PT1H')
   lines.push('X-PUBLISHED-TTL:PT1H')
 
   const now = formatICSDate(new Date())
@@ -64,6 +66,7 @@ export async function GET(request: Request) {
     status: 200,
     headers: {
       'Content-Type': 'text/calendar; charset=utf-8',
+      'Content-Disposition': 'attachment; filename="nanny-shifts.ics"',
       'Cache-Control': 'public, max-age=300'
     }
   })
